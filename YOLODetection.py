@@ -94,9 +94,6 @@ while True:
         2,
     )
 
-    if len(badgeBoxes) > 0:
-        print("update", len(badgeBoxes))
-
     if WIDTH > SHOW_WIDTH:
         frame = cv2.resize(frame, (SHOW_WIDTH, int(HEIGHT * SHOW_WIDTH / WIDTH)))
 
