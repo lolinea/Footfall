@@ -176,71 +176,71 @@ def main():
                     'confidence' : conf
                 }
 
-        sortedFrames = sorted(present)
+    sortedFrames = sorted(present)
 
-        segments, start = [], None
+    segments, start = [], None
 
-        for k, frame in enumerate(sortedFrames):
-            if start is None:
-                start = frame
+    for k, frame in enumerate(sortedFrames):
+        if start is None:
+            start = frame
 
-            last = (k == len(sortedFrames) - 1) or sortedFrames[k+1] != frame + 1
+        last = (k == len(sortedFrames) - 1) or sortedFrames[k+1] != frame + 1
 
-            if last:
-                segments.append((start, frame))
-                start = None
+        if last:
+            segments.append((start, frame))
+            start = None
+
+    for start, end in segments:
+        hasAnchor = any(present[i]['source'] == 'anchorsList' for i in range(start, end + 1))
+
+        if (end - start + 1) < MIN_SEGMENT and not hasAnchor:
+            for frame in range(start, end + 1):
+                present.pop(frame)
+
+    segments = [(start, end) for start, end in segments if any(frame in present for frame in range(start, end + 1))]
+
+    with open ('frames.csv', 'w', newline = "") as file:
+        w = csv.writer(file)
+        w.writerow(['frame', 'timeS', 'staffPresent', 'x', 'y', 'boxX', 'boxY', 'boxWidth', 'boxHeight', 'source', 'confidence'])
+
+        for frame in range(nFrames):
+            p = present.get(frame)
+
+            if p:
+                boxX, boxY, boxWidth, boxHeight = p['box']
+                w.writerow([frame, round(frame / fps, 2), 1, p['x'], p['y'], boxX, boxY, boxWidth, boxHeight, p['source'], p['confidence']])
+            else:
+                    w.writerow([frame, round(frame / fps, 2), 0, '', '', '', '', '', '', '', ''])
+
+    with open('segments.csv', 'w', newline="") as file:
+        w = csv.writer(file)
+        w.writerow(['startFrame', 'endFrame', 'startS', 'endS', 'nFrames'])
 
         for start, end in segments:
-            hasAnchor = any(present[i]['source'] == 'anchorsList' for i in range(start, end + 1))
+            w.writerow([start, end, round(start / fps, 2), round(end / fps, 2), end - start + 1])
 
-            if (end - start + 1) < MIN_SEGMENT and not hasAnchor:
-                for frame in range(start, end + 1):
-                    present.pop(frame)
+    cap = cv2.VideoCapture(VIDEO)
+    out = cv2.VideoWriter('annotated.mp4', cv2.VideoWriter_fourcc(*'mp4v'), fps, (WIDTH, HEIGHT))
 
-        segments = [(start, end) for start, end in segments if any(frame in present for frame in range(start, end + 1))]
+    f = 0
 
-        with open ('frames.csv', 'w', newline = "") as file:
-            w = csv.writer(file)
-            w.writerow(['frame', 'timeS', 'staffPresent', 'x', 'y', 'boxX', 'boxY', 'boxWidth', 'boxHeight', 'source', 'confidence'])
+    while True: 
+        ready, frame = cap.read()
 
-            for frame in range(nFrames):
-                p = present.get(frame)
+        if not ready:
+            break
 
-                if p:
-                    boxX, boxY, boxWidth, boxHeight = p['box']
-                    w.writerow([frame, round(frame / fps, 2), 1, p['x'], p['y'], boxX, boxY, boxWidth, boxHeight, p['source'], p['confidence']])
-                else:
-                     w.writerow([frame, round(frame / fps, 2), 0, '', '', '', '', '', '', '', ''])
+        p = present.get(f)
 
-        with open('segments.csv', 'w', newline="") as file:
-            w = csv.writer(file)
-            w.writerow(['startFrame', 'endFrame', 'startS', 'endS', 'nFrames'])
+        if p: 
+            boxX, boxY, boxWidth, boxHeight = p['box']
+            cv2.rectangle(frame, (boxX, boxY), (boxX + boxWidth, boxY + boxHeight), (0, 255, 0), 3)
+            cv2.putText(frame, 'STAFF', (boxX, max(boxY - 8, 15)), 0, 0.8, (0, 255, 0), 2)
 
-            for start, end in segments:
-                w.writerow([start, end, round(start / fps, 2), round(end / fps, 2), end - start + 1])
+        out.write(frame)
+        f += 1
 
-        cap = cv2.VideoCapture(VIDEO)
-        out = cv2.VideoWriter('annotated.mp4', cv2.VideoWriter_fourcc(*'mp4v'), fps, (WIDTH, HEIGHT))
-
-        f = 0
-
-        while True: 
-            ready, frame = cap.read()
-
-            if not ready:
-                break
-
-            p = present.get(f)
-
-            if p: 
-                boxX, boxY, boxWidth, boxHeight = p['box']
-                cv2.rectangle(frame, (boxX, boxY), (boxX + boxWidth, boxY + boxHeight), (0, 255, 0), 3)
-                cv2.putText(frame, 'STAFF', (boxX, max(boxY - 8, 15)), 0, 0.8, (0, 255, 0), 2)
-
-            out.write(frame)
-            f += 1
-
-        out.release()
+    out.release()
 
 if __name__ == '__main__':
     main()
